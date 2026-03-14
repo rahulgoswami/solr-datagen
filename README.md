@@ -21,8 +21,8 @@ Given a Solr URL (with collection/core name) and a target document count, `solr-
 ## Installation
 
 ```bash
-git clone https://github.com/rahulgoswami/DataProducerHarness.git
-cd DataProducerHarness
+git clone https://github.com/rahulgoswami/solr-datagen.git
+cd solr-datagen
 pip install -r requirements.txt
 ```
 
