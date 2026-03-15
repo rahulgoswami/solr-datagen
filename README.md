@@ -2,13 +2,13 @@
 
 Generate and index realistic documents into Apache Solr at scale.
 
-Given a Solr URL (with collection/core name) and a target document count, `solr-datagen` introspects the schema, generates documents with realistic data across all field types, and indexes them in parallel batches. Works with Solr 7.x, 8.x, and 9.x.
+Given a Solr URL (with collection/core name) and a target document count, `solr-datagen` introspects the schema, generates documents with realistic data across all field types, and indexes them in parallel batches. Works with Solr 7.x through 10.x.
 
 ## Features
 
 - **Schema-aware** — automatically discovers fields, types, unique key, and multiValued settings
 - **Type-diverse generation** — covers strings, text, integers, longs, floats, doubles, dates, and booleans
-- **Solr 7–9 compatible** — handles both Trie (7.x) and Point (8.x/9.x) field type classes transparently
+- **Solr 7–10 compatible** — handles both Trie (7.x; deprecated but still present through 10.x) and Point (8.x+) field type classes transparently
 - **Scales to millions** — threaded batch submission with backpressure, `commitWithin` for optimal throughput
 - **Reproducible** — optional `--seed` for deterministic output
 - **Resilient** — exponential-backoff retries on batch failures, graceful Ctrl+C handling

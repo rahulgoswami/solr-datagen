@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 # Maps Solr field-type class names to internal category labels.
-# Covers both Trie (7.x) and Point (8.x / 9.x) variants.
+# Covers both Trie (7.x; deprecated but still present through 10.x) and Point (8.x+) variants.
 FIELD_TYPE_MAP: dict[str, str] = {
     # String / Text
     "solr.StrField": "string",
