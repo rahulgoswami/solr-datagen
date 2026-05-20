@@ -45,9 +45,13 @@ python -m solr_datagen http://localhost:8983/solr/my_collection 1000
 python -m solr_datagen http://localhost:8983/solr/my_collection 1000000 \
   --batch-size 1000 --workers 8
 
-# With basic auth (Solr 9.x)
+# With basic auth
 python -m solr_datagen http://localhost:8983/solr/my_collection 5000 \
   --auth admin:secret
+
+# Always include specific fields alongside the diverse selection
+python -m solr_datagen http://localhost:8983/solr/my_collection 1000 \
+  --include-fields title,price,category
 
 # Reproducible run
 python -m solr_datagen http://localhost:8983/solr/my_collection 500 --seed 42
@@ -66,6 +70,7 @@ python -m solr_datagen http://localhost:8983/solr/my_collection 500 --seed 42
 | `-w`, `--workers` | 4 | Parallel submission threads |
 | `-a`, `--auth` | None | Basic auth as `user:password` |
 | `-s`, `--seed` | None | Random seed for reproducibility |
+| `--include-fields` | None | Comma-separated field names to always include, in addition to the diverse selection; unknown or unstored names raise an error before indexing starts |
 | `--dry-run` | false | Analyse schema only, don't index |
 | `-v`, `--verbose` | false | Enable debug logging |
 
@@ -73,7 +78,7 @@ python -m solr_datagen http://localhost:8983/solr/my_collection 500 --seed 42
 
 1. **Connect** — validates the Solr URL, detects version and mode (standalone/SolrCloud)
 2. **Introspect** — fetches fields and field types from the Schema API, skips internal and non-stored fields
-3. **Select** — picks a diverse subset of fields (up to `--max-fields`), ensuring representation across type categories
+3. **Select** — picks a diverse subset of fields (up to `--max-fields`), ensuring representation across type categories, plus the unique key, required fields, and any `--include-fields` names
 4. **Generate** — creates documents using pre-computed data pools (via Faker) for high throughput
 5. **Index** — submits documents in parallel batches with backpressure, retries, and progress reporting
 
