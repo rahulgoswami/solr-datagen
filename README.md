@@ -97,6 +97,3 @@ solr_datagen/
 └── progress.py          # progress tracking and reporting
 ```
 
-## License
-
-MIT
