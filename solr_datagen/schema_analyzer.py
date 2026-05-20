@@ -25,8 +25,18 @@ class SchemaAnalyzer:
     def __init__(self, solr_client):
         self.client = solr_client
 
-    def analyze(self, max_fields: int = 20, fields_per_type: int = 3) -> list[FieldSpec]:
-        """Return a list of FieldSpecs to populate, ensuring type diversity."""
+    def analyze(
+        self,
+        max_fields: int = 20,
+        fields_per_type: int = 3,
+        include_fields: list[str] | None = None,
+    ) -> list[FieldSpec]:
+        """Return a list of FieldSpecs to populate, ensuring type diversity.
+
+        Fields listed in ``include_fields`` are forced into the selection
+        regardless of the diverse-selection caps. Raises ``ValueError`` if any
+        named field is not present in the schema with a generatable type.
+        """
         fields = self.client.get_fields()
         field_types = self.client.get_field_types()
         unique_key = self.client.get_unique_key()
@@ -70,18 +80,43 @@ class SchemaAnalyzer:
                 required=field.get("required", False) or (name == unique_key),
             ))
 
-        # Ensure unique-key field is always included
-        selected = self._select_diverse(specs, max_fields, fields_per_type)
+        # Validate --include-fields names before selection.
+        if include_fields:
+            spec_names = {s.name for s in specs}
+            schema_names = {f["name"] for f in fields}
+            missing = [n for n in include_fields if n not in spec_names]
+            if missing:
+                not_in_schema = [n for n in missing if n not in schema_names]
+                unusable = [n for n in missing if n in schema_names]
+                parts = []
+                if not_in_schema:
+                    parts.append(f"not in schema: {', '.join(not_in_schema)}")
+                if unusable:
+                    parts.append(
+                        f"present but unusable (internal, not stored/docValues, "
+                        f"or unmapped type): {', '.join(unusable)}"
+                    )
+                raise ValueError("--include-fields " + "; ".join(parts))
+
+        # Ensure unique-key, required, and explicitly-included fields are always included.
+        selected = self._select_diverse(specs, max_fields, fields_per_type, include_fields or ())
         return selected
 
     @staticmethod
     def _select_diverse(
-        specs: list[FieldSpec], max_fields: int, fields_per_type: int
+        specs: list[FieldSpec],
+        max_fields: int,
+        fields_per_type: int,
+        include_fields=(),
     ) -> list[FieldSpec]:
         """Pick up to `fields_per_type` fields per category, capped at `max_fields`."""
-        # Always include unique-key and required fields first
-        must_have = [s for s in specs if s.is_unique_key or s.required]
-        remaining = [s for s in specs if not s.is_unique_key and not s.required]
+        # Always include unique-key, required, and explicitly-requested fields first.
+        forced = set(include_fields)
+        must_have = [s for s in specs if s.is_unique_key or s.required or s.name in forced]
+        remaining = [
+            s for s in specs
+            if not (s.is_unique_key or s.required or s.name in forced)
+        ]
 
         # Group remaining by category
         by_category: dict[str, list[FieldSpec]] = {}

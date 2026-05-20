@@ -29,6 +29,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("-w", "--workers", type=int, default=4, help="Parallel submission threads (default: %(default)s)")
     p.add_argument("-a", "--auth", default=None, help="Basic auth as user:password")
     p.add_argument("-s", "--seed", type=int, default=None, help="Random seed for reproducibility")
+    p.add_argument(
+        "--include-fields",
+        default=None,
+        help="Comma-separated field names to always include in every document, in addition to the diverse selection",
+    )
     p.add_argument("--dry-run", action="store_true", help="Analyse schema only, don't index")
     p.add_argument("-v", "--verbose", action="store_true", help="Debug logging")
     return p.parse_args(argv)
@@ -67,8 +72,22 @@ def main(argv: list[str] | None = None) -> None:
     print(f"Connected to Solr {version} ({mode}) — collection: {client.collection}")
 
     # ---- Analyse schema ----
+    include_fields = (
+        [f.strip() for f in args.include_fields.split(",") if f.strip()]
+        if args.include_fields
+        else None
+    )
+
     analyzer = SchemaAnalyzer(client)
-    fields = analyzer.analyze(max_fields=args.max_fields, fields_per_type=args.fields_per_type)
+    try:
+        fields = analyzer.analyze(
+            max_fields=args.max_fields,
+            fields_per_type=args.fields_per_type,
+            include_fields=include_fields,
+        )
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
     if not fields:
         print("ERROR: No indexable fields found (stored=true or docValues=true)", file=sys.stderr)
         sys.exit(1)
