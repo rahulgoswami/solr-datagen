@@ -10,6 +10,10 @@ import requests
 logger = logging.getLogger(__name__)
 
 
+class VersionConflictError(RuntimeError):
+    """Raised when a document update is rejected due to an _version_ mismatch."""
+
+
 class SolrClient:
     """Thin wrapper around the Solr REST API."""
 
@@ -62,14 +66,58 @@ class SolrClient:
         resp = self._get(f"{self.base_url}/{self.collection}/schema/uniquekey")
         return resp["uniqueKey"]
 
+    def get_field_info(self, name: str) -> dict:
+        """Return the schema definition for a single named field."""
+        resp = self._get(f"{self.base_url}/{self.collection}/schema/fields/{name}")
+        return resp["field"]
+
+    def get_copy_fields(self) -> list[dict]:
+        """Return the list of copyField rules (each has 'source' and 'dest' keys)."""
+        resp = self._get(f"{self.base_url}/{self.collection}/schema/copyfields")
+        return resp.get("copyFields", [])
+
+    # ------------------------------------------------------------------
+    # Query helpers
+    # ------------------------------------------------------------------
+
+    def search_cursor(
+        self,
+        q: str,
+        fq: str | None,
+        sort: str,
+        rows: int,
+        cursor_mark: str,
+        fl: str = "*,_version_",
+    ) -> dict:
+        """Issue a /select request using cursorMark for deep paging."""
+        params: dict = {
+            "q": q,
+            "sort": sort,
+            "rows": rows,
+            "cursorMark": cursor_mark,
+            "fl": fl,
+            "wt": "json",
+        }
+        if fq:
+            params["fq"] = fq
+        return self._get(f"{self.base_url}/{self.collection}/select", params=params)
+
     # ------------------------------------------------------------------
     # Indexing
     # ------------------------------------------------------------------
 
     def post_documents(self, docs: list[dict], commit_within: int) -> dict:
         """POST a batch of documents to Solr's update handler."""
-        url = f"{self.base_url}/{self.collection}/update?commitWithin={commit_within}"
-        return self._post(url, docs)
+        url = f"{self.base_url}/{self.collection}/update"
+        if commit_within > 0:
+            url += f"?commitWithin={commit_within}"
+        result = self._post(url, docs)
+        # Defensive: Solr sometimes embeds a per-doc version conflict in a 200 response.
+        if result.get("responseHeader", {}).get("status", 0) != 0:
+            err = result.get("error", {})
+            if err.get("code") == 409:
+                raise VersionConflictError(err.get("msg", "version conflict"))
+        return result
 
     def commit(self) -> dict:
         """Issue an explicit hard commit."""
@@ -105,10 +153,12 @@ class SolrClient:
 
     @staticmethod
     def _check_response(resp: requests.Response) -> None:
-        if resp.status_code == 401 or resp.status_code == 403:
+        if resp.status_code in (401, 403):
             raise PermissionError(
                 "Authentication required. Use --auth user:password"
             )
         if resp.status_code == 404:
             raise FileNotFoundError(f"Not found: {resp.url}")
+        if resp.status_code == 409:
+            raise VersionConflictError(f"Version conflict: {resp.text[:300]}")
         resp.raise_for_status()

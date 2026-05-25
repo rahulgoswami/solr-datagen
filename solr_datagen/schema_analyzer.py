@@ -19,6 +19,37 @@ class FieldSpec:
     required: bool
 
 
+@dataclass
+class ReindexSchema:
+    """Minimal schema info needed to drive a reindex run."""
+    unique_key: str
+    copy_field_rules: list[dict]        # raw list from /schema/copyfields
+    unique_key_field_info: dict         # field definition dict from /schema/fields/<name>
+    unique_key_field_type: dict         # field type definition dict matching the field's type
+
+
+def prepare_reindex_schema(client) -> ReindexSchema:
+    """Fetch uniqueKey, copyField rules, and uniqueKey type info for reindex pre-checks.
+
+    Does NOT touch field selection, FIELD_TYPE_MAP, or category logic — those belong
+    to index mode only.
+    """
+    unique_key = client.get_unique_key()
+    field_info = client.get_field_info(unique_key)
+    field_types = client.get_field_types()
+    copy_field_rules = client.get_copy_fields()
+
+    type_name = field_info.get("type", "")
+    uk_field_type = next((ft for ft in field_types if ft["name"] == type_name), {})
+
+    return ReindexSchema(
+        unique_key=unique_key,
+        copy_field_rules=copy_field_rules,
+        unique_key_field_info=field_info,
+        unique_key_field_type=uk_field_type,
+    )
+
+
 class SchemaAnalyzer:
     """Introspect a Solr schema and select fields suitable for data generation."""
 

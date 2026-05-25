@@ -34,6 +34,7 @@ INTERNAL_FIELDS: set[str] = {"_version_", "_root_", "_text_", "_nest_path_"}
 
 # Defaults
 BATCH_SIZE = 500
-COMMIT_WITHIN_MS = 5000
+COMMIT_WITHIN_MS = 0      # Rely on server-side autoCommit; use -c to override
+READ_BATCH_SIZE = 2000
 PROGRESS_INTERVAL = 10000
 MAX_RETRIES = 3
